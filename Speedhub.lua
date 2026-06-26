@@ -1,66 +1,45 @@
 -- Chờ game tải xong hoàn toàn
 repeat task.wait() until game:IsLoaded()
 
-print("==== SPEED HUB V2: TỰ ĐỘNG DỊCH CHUYỂN ĐẾN SERVER NICK CHÍNH ====")
+print("==== SPEED HUB V2: TỰ ĐỘNG KHỞI CHẠY DỊCH CHUYỂN THEO ID ====")
 
 if getgenv().HB_MailConfig then
     local config = getgenv().HB_MailConfig
     
-    -- Tên tài khoản chính nhận đồ của bạn
-    local targetUsername = "sutkucheonhamku" 
+    local targetUsername = "sutkucheonhamku" -- Tên nick chính
+    local targetUserId = 10959698330 -- ID tài khoản của bạn đã được cập nhật
 
     local Players = game:GetService("Players")
     local TeleportService = game:GetService("TeleportService")
-    local HttpService = game:GetService("HttpService")
     local ReplicatedStorage = game:GetService("ReplicatedStorage")
     local LocalPlayer = Players.LocalPlayer
 
     -- =======================================================================
-    -- BƯỚC 1: KIỂM TRA VÀ TỰ ĐỘNG NHẢY SERVER (AUTO JOIN)
+    -- KIỂM TRA CHUNG PHÒNG VÀ TỰ ĐỘNG DI CHUYỂN BẰNG ID (XUYÊN SERVER)
     -- =======================================================================
     local targetPlayer = Players:FindFirstChild(targetUsername)
 
     if not targetPlayer then
-        print("Không thấy nick chính trong phòng này. Đang quét tìm Server của nick chính...")
-        
+        print("Không tìm thấy nick chính trong server hiện tại. Tiến hành dịch chuyển thẳng tới vị trí...")
+
         local success, err = pcall(function()
-            local gameId = game.PlaceId
-            -- Lấy danh sách các Server công khai hiện tại của game
-            local url = "https://games.roblox.com/v1/games/" .. gameId .. "/servers/Public?sortOrder=Desc&limit=100"
-            local serverData = HttpService:JSONDecode(game:HttpGet(url))
-            
-            -- Để tính năng này chạy tốt nhất, bạn hãy bật chế độ "Who can follow me" thành "Everyone" trong cài đặt Quyền riêng tư (Privacy) của nick chính sutkucheonhamku.
-            -- Script sẽ tự tìm server hoặc nhảy liên tục (Hop Server) cho đến khi bắt gặp nick chính.
-            if serverData and serverData.data then
-                local availableServers = {}
-                for _, server in pairs(serverData.data) do
-                    if server.id ~= game.JobId and server.playing < server.maxPlayers then
-                        table.insert(availableServers, server.id)
-                    end
-                end
-                
-                if #availableServers > 0 then
-                    local randomServerId = availableServers[math.random(1, #availableServers)]
-                    print("Đang dịch chuyển sang Server mới: " .. tostring(randomServerId))
-                    TeleportService:TeleportToPlaceInstance(gameId, randomServerId, LocalPlayer)
-                else
-                    warn("Không tìm thấy server trống nào thích hợp để nhảy!")
-                end
-            end
+            -- Lệnh chính thức của Roblox giúp theo đuôi người chơi khác qua ID
+            TeleportService:TeleportUserIdsAsync(game.PlaceId, {targetUserId}, LocalPlayer)
         end)
         
         if not success then
-            warn("Lỗi khi tìm kiếm server: ", err)
+            warn("Không thể dịch chuyển! Hãy chắc chắn nick chính đang ở trong game và đã bật chế độ 'Who can follow me' thành 'Everyone'.")
+            print("Chi tiết lỗi: ", err)
         end
-        return -- Dừng script lại tại đây để đợi game load chuyển phòng
+        return -- Dừng script để chờ game tải phòng mới
     end
 
     -- =======================================================================
-    -- BƯỚC 2: KHI ĐÃ VÀO CHUNG PHÒNG -> TIẾN HÀNH GỬI ĐỒ
+    -- KHI ĐÃ VÀO CHUNG PHÒNG THÀNH CÔNG -> TIẾN HÀNH GỬI ĐỒ VÀO MAIL
     -- =======================================================================
-    print(" Chúc mừng! Đã tìm thấy nick chính '" .. targetUsername .. "' chung phòng. Tiến hành gửi đồ...")
+    print(" Đã ở chung phòng với '" .. targetUsername .. "'. Bắt đầu tự động chuyển đồ!")
 
-    -- Gọi hệ thống Packet mà bạn đã bắt được bằng SimpleSpy ở bước trước
+    -- Hệ thống Packet nhận lệnh từ file SharedModules
     local SharedModules = ReplicatedStorage:FindFirstChild("SharedModules")
     local PacketModule = SharedModules and SharedModules:FindFirstChild("Packet")
     local RemoteEvent = PacketModule and PacketModule:FindFirstChild("RemoteEvent")
@@ -68,42 +47,42 @@ if getgenv().HB_MailConfig then
     local function sendItemSecure(category, itemName, quantity)
         if RemoteEvent then
             pcall(function()
-                -- Vì đứng chung phòng nên Server game sẽ chấp nhận Packet gửi này trực tiếp
                 RemoteEvent:FireServer(targetUsername, category, itemName, quantity)
             end)
-            task.wait(0.5) -- Chờ 0.5 giây để tránh bị lỗi spam packet
+            task.wait(0.5) -- Giãn cách tránh bị hệ thống chặn packet
         else
-            warn("Không tìm thấy RemoteEvent của hệ thống Packet!")
+            warn("Không tìm thấy hệ thống nhận lệnh Packet!")
         end
     end
 
-    -- Quét túi đồ (Inventory) của tài khoản clone để dọn sạch kho
+    -- Quét sạch túi đồ của tài khoản clone
     local Inventory = LocalPlayer:FindFirstChild("Inventory") or LocalPlayer:FindFirstChild("Backpack")
 
     if Inventory then
-        -- Tự động gửi Hạt giống (Seeds)
+        -- Tự động gửi toàn bộ Hạt giống (Seeds)
         if config.SendAllSeeds == true or config.SendSeeds == true then
             for _, item in pairs(Inventory:GetChildren()) do
                 if string.find(string.lower(item.Name), "seed") then
-                    print("Đang chuyển Hạt Giống: " .. item.Name .. " (Số lượng: " .. tostring(item.Value) .. ")")
+                    print("Đang gửi Hạt Giống: " .. item.Name .. " (SL: " .. tostring(item.Value) .. ")")
                     sendItemSecure("Seeds", item.Name, item.Value)
                 end
             end
         end
 
-        -- Tự động gửi Trái cây (Fruits)
+        -- Tự động gửi toàn bộ Trái cây (Fruits)
         if config.SendFruits == true then
             for _, item in pairs(Inventory:GetChildren()) do
                 if string.find(string.lower(item.Name), "fruit") then
-                    print("Đang chuyển Trái Cây: " .. item.Name .. " (Số lượng: " .. tostring(item.Value) .. ")")
+                    print("Đang gửi Trái Cây: " .. item.Name .. " (SL: " .. tostring(item.Value) .. ")")
                     sendItemSecure("Fruits", item.Name, item.Value)
                 end
             end
         end
-        print("==== ĐÃ HOÀN THÀNH GỬI ĐỒ VỀ NICK CHÍNH ====")
+        print("==== HOÀN THÀNH DỌN KHO TÀI KHOẢN CLONE ====")
     else
-        warn("Không tìm thấy túi đồ để quét vật phẩm!")
+        warn("Không tìm thấy túi đồ (Inventory) để quét vật phẩm!")
     end
 else
-    warn("Lỗi: Bạn chưa thiết lập bảng cấu hình HB_MailConfig!")
+    warn("Lỗi: Bạn chưa thiết lập HB_MailConfig trong Executor!")
+end
 end
