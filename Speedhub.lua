@@ -69,7 +69,7 @@ local function sendItemSecure(category, itemName, quantity)
 end
 
 task.spawn(function()
-    task.wait(10) -- Chờ đúng 10 giây sau khi vào server thành công
+    task.wait(40) -- Chờ đúng 10 giây sau khi vào server thành công
     
     local targetPlayer = Players:FindFirstChild(targetUsername)
     if targetPlayer then
